@@ -1,0 +1,82 @@
+#include <WiFi.h>
+
+const char* ssid = "ParkingSystem";
+const char* password = "12345678";
+
+WiFiServer server(80);
+
+const int TRIG_PIN = 6;
+const int ECHO_PIN = 5;
+
+float getDistance() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+
+  if (duration == 0) {
+    return 999;
+  }
+
+  float distance = duration * 0.0343 / 2.0;
+  return distance;
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  WiFi.softAP(ssid, password);
+
+  server.begin();
+
+  Serial.println("================================");
+  Serial.println("SMART PARKING SYSTEM STARTED");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.softAPIP());
+  Serial.println("================================");
+}
+
+void loop() {
+
+  float distance = getDistance();
+
+  String status;
+
+  if (distance > 0 && distance < 30) {
+    status = "Occupied";
+  } else {
+    status = "Free";
+  }
+
+  WiFiClient client = server.available();
+
+  if (client) {
+
+    while (client.connected() && !client.available()) {
+      delay(1);
+    }
+
+    while (client.available()) {
+      client.read();
+    }
+
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/plain");
+    client.println("Connection: close");
+    client.println();
+
+    client.print("Status: ");
+    client.println(status);
+
+    client.stop();
+  }
+
+  delay(200);
+}
